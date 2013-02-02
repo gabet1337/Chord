@@ -13,7 +13,8 @@ public class ChordNameServiceImpl implements ChordNameService {
     private int myKey;
     boolean isGroupCreator;
     
-    private HashMap<Integer, ChordObject> data;
+    @SuppressWarnings("unused")
+	private HashMap<Integer, ChordObject> data;
     
     public ChordNameServiceImpl() {
         this.myKey = keyOfName(getChordName());
@@ -69,7 +70,8 @@ public class ChordNameServiceImpl implements ChordNameService {
     }
 
     public void run() {
-        ServerSocket connection;
+        @SuppressWarnings("unused")
+		ServerSocket connection;
         try {
             connection = new ServerSocket(port);
         } catch (IOException e) {
