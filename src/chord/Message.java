@@ -1,6 +1,6 @@
 package chord;
 
-import java.io.Serializable;
+import java.io.*;
 import java.net.*;
 
 public class Message implements Serializable {
@@ -17,7 +17,7 @@ public class Message implements Serializable {
     public InetSocketAddress result; 
     
     
-    public enum Type {
+    public enum Type implements Serializable {
         LOOKUP, SET_PREDECESSOR, SET_SUCCESSOR, GET_PREDECESSOR, GET_SUCCESSOR;
     }
     
@@ -25,6 +25,10 @@ public class Message implements Serializable {
         this.type = type;
         this.key = key;
         this.result = addr;
+    }
+    
+    public String toString() {
+        return "" + type + " key: " + key + " result: " + result;
     }
     
 }

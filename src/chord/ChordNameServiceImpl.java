@@ -12,18 +12,18 @@ public class ChordNameServiceImpl implements ChordNameService {
     private InetSocketAddress successor;
     private InetSocketAddress predecessor;
     private int port;
-    public boolean isRunning;
+    private boolean isRunning;
 
     private Object isRunningLock = new Object();
 
     private ServerSocket serverSocket;
-
 
     public int keyOfName(InetSocketAddress name) {
         return Math.abs(name.hashCode()*1073741651 % 2147483647);
     }
 
     public void createGroup(int port) {
+        System.out.println("Creating grp on port: " + port);
         synchronized(isRunningLock) {
             this.port = port;
             this.myAddress = getMyName();
@@ -31,31 +31,34 @@ public class ChordNameServiceImpl implements ChordNameService {
             this.successor = myAddress;
             this.predecessor = myAddress;
             isRunning = true;
-            run();
         }
     }
 
     public void joinGroup(InetSocketAddress knownPeer, int port) {
-        this.port = port;
-        this.myAddress = getMyName();
-        this.myKey = keyOfName(myAddress);
-        this.successor = getSuccessor(knownPeer);
-        this.predecessor = getPredecessor();
+        synchronized(isRunningLock) {
+            this.port = port;
+            this.myAddress = getMyName();
+            this.myKey = keyOfName(myAddress);
+            this.successor = getSuccessor(knownPeer);
+            System.out.println("Got successor " + successor);
+            this.predecessor = getPredecessor();
 
-        sendMessage(new Message(Message.Type.SET_PREDECESSOR, 0, myAddress), successor);
-        sendMessage(new Message(Message.Type.SET_SUCCESSOR, 0, myAddress), predecessor);
-        isRunning = true;
-        run();
+            sendMessage(new Message(Message.Type.SET_PREDECESSOR, 0, myAddress), successor);
+            sendMessage(new Message(Message.Type.SET_SUCCESSOR, 0, myAddress), predecessor);
+            isRunning = true;
+        }
     }
 
 
 
     public InetSocketAddress getChordName() {
-        return myAddress;
+        return this.myAddress;
     }
 
     public void leaveGroup() {
-        isRunning = false;
+        synchronized(isRunningLock) {
+            isRunning = false;
+        }
     }
 
     public InetSocketAddress succ() {
@@ -97,17 +100,16 @@ public class ChordNameServiceImpl implements ChordNameService {
 
 
     public void run() {
-        System.out.println("ID: " + myAddress.toString() + " and my key is: " + myKey);
+        System.out.println("ID: " + myAddress.toString() + " and my key is: " + myKey + " started running");
 
         while (isRunning) {
 
             Socket socket = waitForConnection();
 
             if (socket != null) {
-                System.out.println("MYID: " + myAddress.toString() + " has an incoming connection at: " + socket.getInetAddress());
-                ObjectInputStream input = getOIS(socket);
+                System.out.println("ID: " + myAddress + " has an incoming connection at: " + socket.getInetAddress() + ":" + socket.getPort());
 
-                Message msg = getMessage(input);
+                Message msg = getMessage(socket);
 
                 switch (msg.type) {
 
@@ -137,15 +139,25 @@ public class ChordNameServiceImpl implements ChordNameService {
                     System.err.println("UNKNOWN MESSAGE RECEIVED");
                 }
                 }
-
             }
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            
         }
         sendMessage(new Message(Message.Type.SET_PREDECESSOR, 0, predecessor), successor);
         sendMessage(new Message(Message.Type.SET_SUCCESSOR, 0, successor), predecessor);
 
     }
 
+    public String toString() {
+        return "ID: " + myAddress + " has succ: " + succ() + " and pred: " + pred() + " and my key is " + myKey;
+    }
+
     private Socket waitForConnection() {
+        System.out.println("ID: " + myAddress + " are now waiting for connections");
         Socket result = null;
         try {
             serverSocket = new ServerSocket(port);
@@ -157,6 +169,7 @@ public class ChordNameServiceImpl implements ChordNameService {
     }
 
     private ObjectInputStream getOIS(Socket socket) {
+        System.out.println("Creating OIS for socket: " + socket.getLocalAddress() + ":" + socket.getLocalPort());
         ObjectInputStream res = null;
         try {
             res = new ObjectInputStream(socket.getInputStream());
@@ -176,16 +189,22 @@ public class ChordNameServiceImpl implements ChordNameService {
         return res;
     }
 
-    private Message getMessage(ObjectInputStream ois) {
-        Message result = null;
+    private synchronized Message getMessage(Socket s) {
+        System.out.println("ID: " + myAddress + " is getting a message");
         try {
-            result = (Message) ois.readObject();
+            ObjectInputStream ois = getOIS(s);
+            System.out.println("reading");
+            Message result = (Message) ois.readObject();
+            ois.close();
+            s.close();
+            System.out.println("Read and sending it back");
+            return result;
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return result;
+        return null;
     }
 
     private void sendInetSocketAddress(ObjectOutputStream oos, InetSocketAddress inet) {
@@ -199,7 +218,7 @@ public class ChordNameServiceImpl implements ChordNameService {
     private InetSocketAddress getMyName() {
         try {
             InetAddress localhost = InetAddress.getLocalHost();
-            InetSocketAddress name = new InetSocketAddress(localhost, port);
+            InetSocketAddress name = new InetSocketAddress(localhost, this.port);
             return name;
         } catch (UnknownHostException e) {
             e.printStackTrace();
@@ -208,11 +227,12 @@ public class ChordNameServiceImpl implements ChordNameService {
     }
 
     private InetSocketAddress getPredecessor() {
+        System.out.println("ID: " + myAddress + " is now asking for pred");
         Socket s = null;
         ObjectOutputStream output = null;
         ObjectInputStream input = null;
         try {
-            s = new Socket(successor.getAddress(), successor.getPort());
+            s = new Socket(successor.getAddress(), successor.getPort(), myAddress.getAddress(), this.port);
             output = new ObjectOutputStream(s.getOutputStream());
             input = new ObjectInputStream(s.getInputStream());
 
@@ -228,25 +248,28 @@ public class ChordNameServiceImpl implements ChordNameService {
         }
         return null;
     }
-    
+
     private InetSocketAddress getSuccessor(InetSocketAddress knownPeer) {
+        System.out.println("ID: " + myAddress + " is now asking for succ of: " + knownPeer);
         Socket s = null;
         ObjectOutputStream output = null;
         ObjectInputStream input = null;
         try {
-            s = new Socket(successor.getAddress(), successor.getPort());
+            s = new Socket(knownPeer.getAddress(), knownPeer.getPort(), this.myAddress.getAddress(), this.port);
             output = new ObjectOutputStream(s.getOutputStream());
             input = new ObjectInputStream(s.getInputStream());
-
-            output.writeObject(new Message(Message.Type.LOOKUP, myKey, null));
+            
+            Message msg = new Message(Message.Type.LOOKUP, myKey, null);
+            System.out.println("Sending message");
+            output.writeObject(msg);
             output.flush();
             output.close();
-            
+
             InetSocketAddress result = (InetSocketAddress) input.readObject();
-            input.close();
-            s.close();
+            if (result != null)
+                return result;
             
-            return result;
+            throw new RuntimeException("FUCK");
             
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
