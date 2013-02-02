@@ -2,8 +2,13 @@ package chord;
 
 import interfaces.ChordNameService;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class ChordNameServiceImpl extends Thread implements ChordNameService  {
@@ -15,6 +20,9 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 	private InetSocketAddress suc;
 	private InetSocketAddress pre;
 	private InetSocketAddress connectedAt;
+
+	protected ServerSocket serverSocket;
+
 
 	public int keyOfName(InetSocketAddress name)  {
 		int tmp = name.hashCode()*1073741651 % 2147483647;
@@ -81,15 +89,59 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 		return myName; 
 	}
 
+	protected Socket waitForConnectionFromClient() {
+		Socket res = null;
+		try {
+			res = serverSocket.accept();
+		} catch (IOException e) {
+			// We return null on IOExceptions
+		}
+		return res;
+	}
+
+	protected void registerOnPort() {
+		try {
+			serverSocket = new ServerSocket(port);
+		} catch (IOException e) {
+			serverSocket = null;
+			System.err.println("Cannot open server socket on port number" + port);
+			System.err.println(e);
+			System.exit(-1);			
+		}
+	}
+
 	public void run() {
 		System.out.println("My name is " + myName + " and my key is " + myKey);
-		
+
 		System.out.println("My name is " + myName + " and my key is " + myKey + ": run()");
-		
-		while(true) {
-			
+
+		registerOnPort();
+
+		while (true) {
+			Socket socket = waitForConnectionFromClient();
+
+			if (socket != null) {
+				System.out.println("Connection from " + socket);
+				try {
+					BufferedReader fromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+					String s;
+					// Read and print what the client is sending
+					while ((s = fromClient.readLine()) != null) { // Ctrl-D terminates the connection
+						System.out.println("From the client: " + s);
+					}		    
+					socket.close();
+				} catch (IOException e) {
+					// We report but otherwise ignore IOExceptions
+					System.err.println(e);
+				}
+				System.out.println("Connection closed by client.");
+			} else {
+				// We rather agressively terminate the server on the first connection exception
+				break;
+			}
 		}
-		
+
+
 		/*
 		 * If joining we should now enter the existing group and
 		 * should at some point register this peer on its port if not
