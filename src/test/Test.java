@@ -51,7 +51,7 @@ public class Test {
 			known.lookup(i).put(i, i);
 		}
 		System.out.println(this);
-
+		
 		reset();
 		known = createNode(7);
 		for (int i = 0; i < 20; i++) {
