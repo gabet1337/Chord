@@ -1,85 +1,111 @@
 package chord;
-import interfaces.*;
 
-import java.net.*;
-import java.io.*;
-import java.util.*;
+import interfaces.ChordNameService;
 
-public class ChordNameServiceImpl implements ChordNameService {
+import java.net.InetSocketAddress;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
-    private InetSocketAddress succ;
-    private InetSocketAddress pred;
+public class ChordNameServiceImpl extends Thread implements ChordNameService  {
+
+    private boolean joining;
     private int port;
-    private int myKey;
-    boolean isGroupCreator;
-    
-    @SuppressWarnings("unused")
-	private HashMap<Integer, ChordObject> data;
-    
-    public ChordNameServiceImpl() {
-        this.myKey = keyOfName(getChordName());
+    protected InetSocketAddress myName;
+    protected int myKey;
+    private InetSocketAddress suc;
+    private InetSocketAddress pre;
+    private InetSocketAddress connectedAt;
+
+    public int keyOfName(InetSocketAddress name)  {
+	int tmp = name.hashCode()*1073741651 % 2147483647;
+	if (tmp < 0) { tmp = -tmp; }
+	return tmp;
     }
 
-    public int keyOfName(InetSocketAddress name) {
-        return Math.abs(name.hashCode() * 1073741651 % 2147483647);
+    public InetSocketAddress getChordName()  {
+	return myName;
+    }
+
+    /**
+     * Computes the name of this peer by resolving the local host name
+     * and adding the current portname.
+     */
+    protected InetSocketAddress _getMyName() {
+	try {
+	    InetAddress localhost = InetAddress.getLocalHost();
+	    InetSocketAddress name = new InetSocketAddress(localhost, port);
+	    return name;
+	} catch (UnknownHostException e) {
+	    System.err.println("Cannot resolve the Internet address of the local host.");
+	    System.err.println(e);
+	}
+	return null;
     }
 
     public void createGroup(int port) {
-        this.port = port;
-        isGroupCreator = true;
-        succ = pred = this.getChordName();
-        run();
+	joining = false;
+	this.port = port;
+	myName = _getMyName();
+	myKey = keyOfName(myName);
+	start();
     }
-
-    public void joinGroup(InetSocketAddress knownPeer, int port) {
-        this.port = port;
-        isGroupCreator = false;
-        run();
-    }
-
-    public InetSocketAddress getChordName() {
-        try {
-            return new InetSocketAddress(InetAddress.getLocalHost(), port);
-        } catch (UnknownHostException e) {
-            System.err.println("Could not resolve host name");
-            System.err.println(e);
-        }
-        return null;
+	
+    public void joinGroup(InetSocketAddress knownPeer, int port)  {
+	joining = true;
+	this.port = port;
+	connectedAt = knownPeer;
+	myName = _getMyName();
+	myKey = keyOfName(myName);
+	start();
     }
 
     public void leaveGroup() {
-        // TODO Auto-generated method stub
-
+	// More code needed here!
     }
 
     public InetSocketAddress succ() {
-        return succ;
+	return suc; // You might want to modify this.
     }
 
     public InetSocketAddress pred() {
-        return pred;
+	return pre; // You might want to modify this.
     }
-
+    
     public InetSocketAddress lookup(int key) {
-        if (keyOfName(pred) < key && key <= myKey) {
-            return this.getChordName();
-        } else {
-            // need to use RMI or JMS here... Pros/cons.. This exercise is big
-            return null;
-        }
+	/*
+	 * The below works fine for singleton groups, but you might
+	 * want to connect to the rest of the group to lookup the
+	 * responsible if the group is larger.
+	 */
+	return myName; 
+    }
+    
+    public void run() {
+	System.out.println("My name is " + myName + " and my key is " + myKey);
+
+	/*
+	 * If joining we should now enter the existing group and
+	 * should at some point register this peer on its port if not
+	 * already done and start listening for incoming connection
+	 * from other peers who want to enter or leave the
+	 * group. After leaveGroup() was called, the run() method
+	 * should return so that the threat running it might
+	 * terminate.
+	 */
     }
 
-    public void run() {
-        @SuppressWarnings("unused")
-		ServerSocket connection;
-        try {
-            connection = new ServerSocket(port);
-        } catch (IOException e) {
-            System.err.println("There was a problem during socket creation");
-            System.err.println(e);
-        }
-        while (true) {
-        }
+    public static void main(String[] args) {
+    	ChordNameService peer1 = new ChordNameServiceImpl();
+    	ChordNameService peer2 = new ChordNameServiceImpl();
+    	ChordNameService peer3 = new ChordNameServiceImpl();
+
+    	peer1.createGroup(40001);
+    	peer2.joinGroup(peer1.getChordName(),40002);
+    	peer3.joinGroup(peer2.getChordName(),40003);
+
+    	peer1.leaveGroup();
+    	peer3.leaveGroup();
+    	peer2.leaveGroup();
     }
 
 }
