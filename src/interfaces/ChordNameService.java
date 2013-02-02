@@ -2,7 +2,6 @@ package interfaces;
 import java.net.InetSocketAddress;
 
 /**
- *
  * Interface for the Chord naming service. Each peer is named by an IP
  * address and a port, technically an InetSocketAddress. Each
  * InetSocketAddress is mapped into a key, an unsigned 31-bit integer,
