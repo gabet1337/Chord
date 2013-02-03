@@ -71,7 +71,25 @@ public class ChordNode implements ChordNameService {
         if (Helper.between(key, keyOfName(_predecessor), keyOfName(_myAddress))) {
             return _myAddress;
         }
-        return null;
+        
+        /*
+         * If im not the holder of the key, I need to find out who it is. To do this
+         * I need to ask my successor and wait for his reply. I will send a message of
+         * type LOOKUP on a new socket to my successor.
+         */
+        
+        Socket s = null;
+        try {
+            s = new Socket(_successor.getAddress(), _successor.getPort());
+        } catch (IOException e) {
+            System.err.println("Could not establish a connection to my successor");
+            System.err.println(e);
+        }
+        
+        _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, key, null));
+        
+        return _msgHandler.receiveMessage(s).result;
+        
     }
 
     public void run() {
