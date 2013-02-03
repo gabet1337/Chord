@@ -70,7 +70,7 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 	}
 
 	public void leaveGroup() {
-		System.out.println("My name is " + myName + " and my key is " + myKey + ": leaveGroup()");
+		//System.out.println("My name is " + myName + " and my key is " + myKey + ": leaveGroup()");
 		// More code needed here!
 	}
 
@@ -96,6 +96,7 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 		try {
 			res = serverSocket.accept();
 		} catch (IOException e) {
+			e.printStackTrace();
 			// We return null on IOExceptions
 		}
 		return res;
@@ -117,54 +118,83 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 		try {
 			res = new Socket(server.getAddress(), server.getPort());
 		} catch (IOException e) {
+			e.printStackTrace();
 			// We return null on IOExceptions
 		}
 		return res;
 	}
 
-	public enum command { LOOKUP }
+	public enum command { LOOKUP, CHANGE_PRE, CHANGE_SUC }
 	
-	public InetSocketAddress send(InetSocketAddress to, command c, String message) {
+	public InetSocketAddress[] send(InetSocketAddress to, command c, InetSocketAddress message) {
 
-		System.out.println("My name is " + myName + " and my key is " + myKey + ": send(" + connectedAt.getAddress() + ":" + connectedAt.getPort() + ")");
+		//System.out.println("My name is " + myName + " and my key is " + myKey + ": send(" + connectedAt.getAddress() + ":" + connectedAt.getPort() + ")");
 
 		Socket socket = connectToServer(to);
 
 		if (socket != null) {
-			System.out.println("Connected to " + socket);
+			//System.out.println("Connected to " + socket);
 			try {
 				PrintWriter toServer = new PrintWriter(socket.getOutputStream(),true);
 				BufferedReader fromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 				
-				toServer.println(c + message);
-				String answer = fromServer.readLine();
+				toServer.println(c + " " + message.getAddress() + ":" + message.getPort());
+				String response = fromServer.readLine();
 				
 				socket.close();
 				
-				String serverName = answer.substring(0,answer.indexOf(":"));
-				int port = Integer.parseInt(answer.substring(answer.indexOf(":") + 1));
+				//System.out.println(response);
 				
-				return new InetSocketAddress(serverName, port);
+				String nodeName = response.split(" ")[0].substring(0,response.split(" ")[0].indexOf(":"));
+				int nodePort = Integer.parseInt(response.split(" ")[0].substring(response.split(" ")[0].indexOf(":") + 1));
+				
+				String preName = response.split(" ")[1].substring(0,response.split(" ")[1].indexOf(":"));
+				int prePort = Integer.parseInt(response.split(" ")[1].substring(response.split(" ")[1].indexOf(":") + 1));
+										
+				InetSocketAddress[] res = new InetSocketAddress[2];
+				res[0] = new InetSocketAddress(nodeName.substring(0,nodeName.indexOf("/")), nodePort);
+				res[1] = new InetSocketAddress(preName.substring(0,preName.indexOf("/")), prePort);
+				
+				return res;
 				
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		} else {
-			System.out.println("My name is " + myName + " and my key is " + myKey + ": socket is null");
+			//System.out.println("My name is " + myName + " and my key is " + myKey + ": socket is null");
 		}
 		return null;
 	}
 
 	public void run() {
 
-		System.out.println("My name is " + myName + " and my key is " + myKey + ": run()");
+		
 
 		if (joining) {
-			System.out.println("My name is " + myName + " and my key is " + myKey + ": joining");
+			//System.out.println("My name is " + myName + " and my key is " + myKey + ": joining");
+			InetSocketAddress[] m = send(connectedAt,command.LOOKUP,getMyName());
+			//send(connectedAt,command.LOOKUP,getMyName());
+			//send(connectedAt,command.LOOKUP,getMyName());
+			//send(connectedAt,command.LOOKUP,getMyName());
+			//send(connectedAt,command.LOOKUP,getMyName());
 			
-			System.out.println(send(connectedAt,command.LOOKUP,"key"));
+			//System.out.println("connectedAt: " + connectedAt.getPort());
+			//System.out.println("m[1]: " + m[1].getHostName());
+			
+			//send(connectedAt,command.LOOKUP,getMyName());
+			
+			//System.out.println(getMyName().toString() + ": Should join on '" + m[0].toString() + "' with pre '" + m[1].toString() + "'");
+			
+			suc = m[0];
+			pre = m[1];
+		
+			send(suc, command.CHANGE_PRE, getMyName());
+			send(pre, command.CHANGE_SUC, getMyName());
+			
 		}
 
+		System.out.println("My name is " + myName + " and my key is " + myKey + " and my pre is " + pre + " and my suc is " + suc);
+		
 		registerOnPort();
 
 		while (true) {
@@ -172,7 +202,7 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 			Socket socket = waitForConnectionFromClient();
 
 			if (socket != null) {
-				System.out.println("Connection from " + socket);
+				//System.out.println("Connection from " + socket);
 				try {
 					PrintWriter toClient = new PrintWriter(socket.getOutputStream(),true);
 					BufferedReader fromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -181,14 +211,59 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 					//while ((s = fromClient.readLine()) != null) { // Ctrl-D terminates the connection
 					//	System.out.println("From the client: " + s);
 					//}
-					System.out.println(s);
-					toClient.println(getMyName());
+					
+					command c = command.valueOf(s.split(" ")[0]);
+						
+					//System.out.println(s.split(" ")[1]);
+					
+					String serverName = s.split(" ")[1].substring(0,s.split(" ")[1].indexOf(":"));
+					int port = Integer.parseInt(s.split(" ")[1].substring(s.split(" ")[1].indexOf(":") + 1));
+					
+					InetSocketAddress message = new InetSocketAddress(serverName.substring(0,serverName.indexOf("/")), port); 
+					
+					if (c == command.LOOKUP) {
+						//System.out.println("Trying lookup");
+						//System.out.println("myKey:" + myKey);
+						//System.out.println("preKey: " + keyOfName(pre));
+						//System.out.println("message: " + keyOfName(message));
+						if (pre.equals(myName) || Helper.between(keyOfName(message), keyOfName(pre), myKey)) {
+							//System.out.println("was between!");
+							toClient.println(getMyName() + " " + pre);
+							//continue;
+						} else {
+							//System.out.println(keyOfName(pre) + " < " + keyOfName(message) + " <= " + myKey);
+							//System.out.println(keyOfName(suc) + " = " + keyOfName(message));
+							//System.out.println("was not between!");
+							//toClient.println(getMyName());
+							toClient.println(send(suc, command.LOOKUP, message));
+							//continue;
+						}
+						//System.out.println("I think you asked for a lookup ?");
+					}
+					
+					if (c == command.CHANGE_PRE) {
+						pre = message;
+						System.out.println("My name is " + myName + " and my key is " + myKey + " and my pre is " + pre + " and my suc is " + suc);
+						//System.out.println(getMyName().toString() + " Change_Pre");
+						//System.out.println("Change_Pre: " + message.toString());
+						toClient.println(getMyName() + " " + getMyName());
+					}
+					
+					if (c == command.CHANGE_SUC) {
+						suc = message;
+						System.out.println("My name is " + myName + " and my key is " + myKey + " and my pre is " + pre + " and my suc is " + suc);
+						//System.out.println(getMyName().toString() + " Change_Suc");
+						//System.out.println("Change_Suc: " + message.toString());
+						toClient.println(getMyName() + " " + getMyName());
+					}
+					
+					//toClient.println(getMyName());
 					socket.close();
 				} catch (IOException e) {
 					// We report but otherwise ignore IOExceptions
 					System.err.println(e);
 				}
-				System.out.println("Connection closed by client.");
+				//System.out.println("Connection closed by client.");
 			} else {
 				// We rather agressively terminate the server on the first connection exception
 				break;
@@ -211,13 +286,13 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 		ChordNameService peer2 = new ChordNameServiceImpl();
 		ChordNameService peer3 = new ChordNameServiceImpl();
 
-		peer1.createGroup(40001);
-		peer2.joinGroup(peer1.getChordName(),40002);
-		peer3.joinGroup(peer2.getChordName(),40003);
+		peer1.createGroup(40009);
+		peer2.joinGroup(peer1.getChordName(),40010);
+		peer3.joinGroup(peer1.getChordName(),40011);
 
-		peer1.leaveGroup();
-		peer3.leaveGroup();
-		peer2.leaveGroup();
+		//peer1.leaveGroup();
+		//peer3.leaveGroup();
+		//peer2.leaveGroup();
 	}
 
 }
