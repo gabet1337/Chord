@@ -81,7 +81,7 @@ public interface ChordNameService extends Runnable {
      *
      * @param key The key for which we seek the responsible peer. Must be non-negative.
      */
-    public InetSocketAddress lookup(int key);
+    public InetSocketAddress lookup(int key, InetSocketAddress origin);
 
     /**
      * Starts the thread which manages this peers participation in

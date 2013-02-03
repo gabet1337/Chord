@@ -11,7 +11,7 @@ public class ChordTest implements Runnable {
         ChordNode creator = new ChordNode(8000);
         creator.createGroup();
         System.out.println(creator.toString());
-        System.out.println(creator.lookup(10));
+        System.out.println(creator.lookup(10, null));
     }
     
     private static void test2() {
@@ -123,7 +123,6 @@ public class ChordTest implements Runnable {
 
     public void run() {
         test4();
-
     }
 
 }

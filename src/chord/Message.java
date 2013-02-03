@@ -21,7 +21,12 @@ public class Message implements Serializable {
      * contains the result we are looking for.
      * Only set this if the type is RESULT
      */
-    public InetSocketAddress result; 
+    public InetSocketAddress result;
+    
+    /*
+     * contains the origin of this message
+     */
+    public InetSocketAddress origin;
     
     
     public enum Type implements Serializable {
@@ -35,7 +40,7 @@ public class Message implements Serializable {
     }
     
     public String toString() {
-        return type + " Key: " + key + ". Result: " + result;
+        return type + " Key: " + key + ". Result: " + result + " Origin: " + origin;
     }
     
 }

@@ -62,14 +62,20 @@ public class ChordNode implements ChordNameService {
         return _predecessor;
     }
 
-    public InetSocketAddress lookup(int key) {
+    public InetSocketAddress lookup(int key, InetSocketAddress origin) {
+        
+        
 
         if (_predecessor.equals(_myAddress)) {
             return _myAddress;
         }
+        
+        if (_successor.equals(origin)) {
+            return origin;
+        }
 
-        if (Helper.between(key, keyOfName(_predecessor), keyOfName(_myAddress))) {
-            return _myAddress;
+        if (Helper.between(key, keyOfName(_myAddress), keyOfName(_successor))) {
+            return _successor;
         }
 
         /*
@@ -87,7 +93,9 @@ public class ChordNode implements ChordNameService {
             System.err.println(e);
         }
 
-        _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, key, null));
+        Message msg = new Message(Message.Type.LOOKUP, key, null);
+        msg.origin = origin;
+        _msgHandler.sendMessage(s, msg);
         
 
         InetSocketAddress result = _msgHandler.receiveMessage(s).result;
@@ -120,7 +128,7 @@ public class ChordNode implements ChordNameService {
 
             if (incomingMsg.type.equals(Message.Type.LOOKUP)) {
                 System.out.println("ID: " + _myAddress + " :: in the LOOKUP handler");
-                _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, incomingMsg.key, lookup(incomingMsg.key)));
+                _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, incomingMsg.key, lookup(incomingMsg.key, incomingMsg.origin)));
 
             } else if (incomingMsg.type.equals(Message.Type.GET_PREDECESSOR)) {
                 System.out.println("ID: " + _myAddress + " :: in the GET_PREDECESSOR handler");
@@ -161,7 +169,10 @@ public class ChordNode implements ChordNameService {
             System.exit(-1);
         }
         //Send a message to our knownPeer so that we can get our new successor.
-        _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, keyOfName(getChordName()), null));
+        Message msg = new Message(Message.Type.LOOKUP, keyOfName(getChordName()), null);
+        //set the origin of the message so we can avoid circular wait
+        msg.origin = _connectedAt;
+        _msgHandler.sendMessage(s, msg);
         //Receive the answer and store the result in _successor
         _successor = _msgHandler.receiveMessage(s).result;
         //Finally close the stream
