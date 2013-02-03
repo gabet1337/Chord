@@ -5,6 +5,7 @@ import interfaces.ChordNameService;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -23,7 +24,6 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 
 	protected ServerSocket serverSocket;
 
-
 	public int keyOfName(InetSocketAddress name)  {
 		int tmp = name.hashCode()*1073741651 % 2147483647;
 		if (tmp < 0) { tmp = -tmp; }
@@ -38,7 +38,7 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 	 * Computes the name of this peer by resolving the local host name
 	 * and adding the current portname.
 	 */
-	protected InetSocketAddress _getMyName() {
+	protected InetSocketAddress getMyName() {
 		try {
 			InetAddress localhost = InetAddress.getLocalHost();
 			InetSocketAddress name = new InetSocketAddress(localhost, port);
@@ -51,19 +51,21 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 	}
 
 	public void createGroup(int port) {
-		joining = false;
+		this.joining = false;
 		this.port = port;
-		myName = _getMyName();
-		myKey = keyOfName(myName);
+		this.myName = getMyName();
+		this.suc = getMyName();
+		this.pre = getMyName();
+		this.myKey = keyOfName(myName);
 		start();
 	}
 
 	public void joinGroup(InetSocketAddress knownPeer, int port)  {
-		joining = true;
+		this.joining = true;
 		this.port = port;
-		connectedAt = knownPeer;
-		myName = _getMyName();
-		myKey = keyOfName(myName);
+		this.connectedAt = knownPeer;
+		this.myName = getMyName();
+		this.myKey = keyOfName(myName);
 		start();
 	}
 
@@ -110,25 +112,77 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 		}
 	}
 
+	protected Socket connectToServer(InetSocketAddress server) {
+		Socket res = null;
+		try {
+			res = new Socket(server.getAddress(), server.getPort());
+		} catch (IOException e) {
+			// We return null on IOExceptions
+		}
+		return res;
+	}
+
+	public enum command { LOOKUP }
+	
+	public InetSocketAddress send(InetSocketAddress to, command c, String message) {
+
+		System.out.println("My name is " + myName + " and my key is " + myKey + ": send(" + connectedAt.getAddress() + ":" + connectedAt.getPort() + ")");
+
+		Socket socket = connectToServer(to);
+
+		if (socket != null) {
+			System.out.println("Connected to " + socket);
+			try {
+				PrintWriter toServer = new PrintWriter(socket.getOutputStream(),true);
+				BufferedReader fromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				
+				toServer.println(c + message);
+				String answer = fromServer.readLine();
+				
+				socket.close();
+				
+				String serverName = answer.substring(0,answer.indexOf(":"));
+				int port = Integer.parseInt(answer.substring(answer.indexOf(":") + 1));
+				
+				return new InetSocketAddress(serverName, port);
+				
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} else {
+			System.out.println("My name is " + myName + " and my key is " + myKey + ": socket is null");
+		}
+		return null;
+	}
+
 	public void run() {
-		System.out.println("My name is " + myName + " and my key is " + myKey);
 
 		System.out.println("My name is " + myName + " and my key is " + myKey + ": run()");
+
+		if (joining) {
+			System.out.println("My name is " + myName + " and my key is " + myKey + ": joining");
+			
+			System.out.println(send(connectedAt,command.LOOKUP,"key"));
+		}
 
 		registerOnPort();
 
 		while (true) {
+
 			Socket socket = waitForConnectionFromClient();
 
 			if (socket != null) {
 				System.out.println("Connection from " + socket);
 				try {
+					PrintWriter toClient = new PrintWriter(socket.getOutputStream(),true);
 					BufferedReader fromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-					String s;
+					String s = fromClient.readLine();
 					// Read and print what the client is sending
-					while ((s = fromClient.readLine()) != null) { // Ctrl-D terminates the connection
-						System.out.println("From the client: " + s);
-					}		    
+					//while ((s = fromClient.readLine()) != null) { // Ctrl-D terminates the connection
+					//	System.out.println("From the client: " + s);
+					//}
+					System.out.println(s);
+					toClient.println(getMyName());
 					socket.close();
 				} catch (IOException e) {
 					// We report but otherwise ignore IOExceptions
@@ -140,7 +194,6 @@ public class ChordNameServiceImpl extends Thread implements ChordNameService  {
 				break;
 			}
 		}
-
 
 		/*
 		 * If joining we should now enter the existing group and
