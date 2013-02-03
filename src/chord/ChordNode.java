@@ -15,6 +15,7 @@ public class ChordNode implements ChordNameService {
     private InetSocketAddress _connectedAt;
 
     private boolean _isJoining;
+    private boolean _isRunning;
 
     public ChordNode(int port) {
         _msgHandler = new MessageHandler();
@@ -39,11 +40,13 @@ public class ChordNode implements ChordNameService {
         _predecessor = _myAddress;
         _successor = _myAddress;
         _isJoining = false;
+        _isRunning = true;
     }
 
     public void joinGroup(InetSocketAddress knownPeer) {
         _isJoining = true;
         _connectedAt = knownPeer;
+        _isRunning = true;
     }
 
     public InetSocketAddress getChordName() {
@@ -51,7 +54,13 @@ public class ChordNode implements ChordNameService {
     }
 
     public void leaveGroup() {
-        // Send message to successor and predecessor about their new succ and pred
+        System.out.println("ID: " + _myAddress + " :: wants to leave the network");
+        try {
+            _serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        _isRunning = false;
     }
 
     public InetSocketAddress succ() {
@@ -63,8 +72,6 @@ public class ChordNode implements ChordNameService {
     }
 
     public InetSocketAddress lookup(int key, InetSocketAddress origin) {
-        
-        
 
         if (_predecessor.equals(_myAddress)) {
             return _myAddress;
@@ -112,11 +119,14 @@ public class ChordNode implements ChordNameService {
 
         System.out.println(this);
 
-        while(true) {
+        while(_isRunning) {
             System.out.println("ID: " + _myAddress + " :: waiting for a connection...");
             Socket s = null;
             try {
                 s = _serverSocket.accept();
+            } catch (SocketException e) {
+                System.err.println("ID: " + _myAddress + " :: the socket was forcefully closed");
+                break;
             } catch (IOException e) {
                 System.err.println("Could not establish connection");
                 System.err.println(e);
@@ -151,11 +161,37 @@ public class ChordNode implements ChordNameService {
             }
 
         }
+        
+        leaveTheChordRing();
 
     }
 
     public String toString() {
         return "ID: " + _myAddress + " :: KEY: " + keyOfName(_myAddress) + " :: SUCC: " + _successor + " :: PRED: " + _predecessor;
+    }
+    
+    private void leaveTheChordRing() {
+        System.out.println("ID: " + _myAddress + " :: started the leaving process");
+        Socket s = null;
+        try {
+            s = new Socket(_successor.getAddress(), _successor.getPort());
+        } catch (IOException e) {
+            System.err.println("Could not connect to our successor");
+            System.err.println(e);
+            System.exit(-1);
+        }
+        //send message to successor about setting his predecessor to my predecessor
+        _msgHandler.sendMessage(s, new Message(Message.Type.SET_PREDECESSOR, 0, _predecessor));
+        try {
+            s = new Socket(_predecessor.getAddress(), _predecessor.getPort());
+        } catch (IOException e) {
+            System.err.println("Could not connect to our predecessor");
+            System.err.println(e);
+            System.exit(-1);
+        }
+        //send message to predecessor about changing his successor to my successor
+        _msgHandler.sendMessage(s, new Message(Message.Type.SET_SUCCESSOR, 0, _successor));
+        System.out.println("ID: " + _myAddress + " :: has succesfully left the chord ring... Goodbye");
     }
 
     private void joinTheChordRing() {
