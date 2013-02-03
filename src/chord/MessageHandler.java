@@ -16,7 +16,9 @@ public class MessageHandler {
             result = (Message) ois.readObject();
             System.out.println("ID: " + getLocalSocketNameAndPort(s) + " :: received message: " + result.toString());
             //ois.close();
-            
+        } catch (SocketTimeoutException e) {
+            System.err.println("Connection timed out");
+            System.err.println(e);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {

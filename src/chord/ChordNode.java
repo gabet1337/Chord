@@ -71,25 +71,29 @@ public class ChordNode implements ChordNameService {
         if (Helper.between(key, keyOfName(_predecessor), keyOfName(_myAddress))) {
             return _myAddress;
         }
-        
+
         /*
          * If im not the holder of the key, I need to find out who it is. To do this
          * I need to ask my successor and wait for his reply. I will send a message of
          * type LOOKUP on a new socket to my successor.
          */
-        
+
         Socket s = null;
         try {
             s = new Socket(_successor.getAddress(), _successor.getPort());
+            s.setSoTimeout(500);
         } catch (IOException e) {
             System.err.println("Could not establish a connection to my successor");
             System.err.println(e);
         }
-        
+
         _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, key, null));
         
-        return _msgHandler.receiveMessage(s).result;
+
+        InetSocketAddress result = _msgHandler.receiveMessage(s).result;
         
+        return result;
+
     }
 
     public void run() {
@@ -97,9 +101,9 @@ public class ChordNode implements ChordNameService {
         if (_isJoining) {
             joinTheChordRing();
         }
-        
+
         System.out.println(this);
-        
+
         while(true) {
             System.out.println("ID: " + _myAddress + " :: waiting for a connection...");
             Socket s = null;
@@ -109,35 +113,35 @@ public class ChordNode implements ChordNameService {
                 System.err.println("Could not establish connection");
                 System.err.println(e);
             }
-            
+
             System.out.println("ID: " + _myAddress + " :: established a connection to " + s.getInetAddress() + ":" + s.getPort());
-            
+
             Message incomingMsg = _msgHandler.receiveMessage(s);
-            
+
             if (incomingMsg.type.equals(Message.Type.LOOKUP)) {
                 System.out.println("ID: " + _myAddress + " :: in the LOOKUP handler");
                 _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, incomingMsg.key, lookup(incomingMsg.key)));
-                
+
             } else if (incomingMsg.type.equals(Message.Type.GET_PREDECESSOR)) {
                 System.out.println("ID: " + _myAddress + " :: in the GET_PREDECESSOR handler");
                 _msgHandler.sendMessage(s, new Message(Message.Type.GET_PREDECESSOR, incomingMsg.key, _predecessor));
-                
+
             } else if (incomingMsg.type.equals(Message.Type.SET_PREDECESSOR)) {
                 System.out.println("ID: " + _myAddress + " :: in the SET_PREDECESSOR handler");
                 _predecessor = incomingMsg.result;
-                
+
             } else if (incomingMsg.type.equals(Message.Type.SET_SUCCESSOR)) {
                 System.out.println("ID: " + _myAddress + " :: in the SET_SUCCESSOR handler");
                 _successor = incomingMsg.result;
-                
+
             }
-            
+
             try {
                 s.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            
+
         }
 
     }
@@ -145,7 +149,7 @@ public class ChordNode implements ChordNameService {
     public String toString() {
         return "ID: " + _myAddress + " :: KEY: " + keyOfName(_myAddress) + " :: SUCC: " + _successor + " :: PRED: " + _predecessor;
     }
-    
+
     private void joinTheChordRing() {
         System.out.println("ID: " + _myAddress + " :: started the joining process");
         Socket s = null;
