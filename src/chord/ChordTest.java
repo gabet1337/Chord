@@ -196,9 +196,44 @@ public class ChordTest implements Runnable {
         System.out.println(node1.toString());
         System.out.println(node2.toString());
     }
+    
+    private static void test6() {
+        ChordNode creator = new ChordNode(4567);
+        creator.createGroup();
+        Thread t1 = new Thread(creator);
+        t1.start();
+        
+        try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+        
+        ChordNode node1 = new ChordNode(4568);
+        node1.joinGroup(creator.getChordName());
+        Thread t2 = new Thread(node1);
+        
+        ChordNode node2 = new ChordNode(4569);
+        node2.joinGroup(creator.getChordName());
+        Thread t3 = new Thread(node2);
+        
+        t2.start();
+        t3.start();
+        
+        try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+        
+        System.out.println(creator.toString());
+        System.out.println(node1.toString());
+        System.out.println(node2.toString());
+
+    }
 
     public void run() {
-        test5();
+        test6();
     }
 
 }
