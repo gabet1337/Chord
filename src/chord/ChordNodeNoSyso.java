@@ -3,9 +3,9 @@ package chord;
 import java.io.IOException;
 import java.net.*;
 
-public class ChordNode implements ChordNameService {
+public class ChordNodeNoSyso implements ChordNameService {
 
-    private MessageHandler _msgHandler;
+    private MessageHandlerNoSyso _msgHandler;
     private ServerSocket _serverSocket;
     private int _port;
 
@@ -16,12 +16,12 @@ public class ChordNode implements ChordNameService {
 
     private boolean _isJoining;
     private boolean _isRunning;
-    
+
     public long _startTimeOfJoin;
     public long _endTimeOfJoin;
 
-    public ChordNode(int port) {
-        _msgHandler = new MessageHandler();
+    public ChordNodeNoSyso(int port) {
+        _msgHandler = new MessageHandlerNoSyso();
         _port = port;
         try {
             _serverSocket = new ServerSocket(port);
@@ -36,7 +36,9 @@ public class ChordNode implements ChordNameService {
     }
 
     public int keyOfName(InetSocketAddress name) {
-        return Math.abs(name.hashCode()*1073741651 % 2147483647);
+        int tmp = name.hashCode()*1073741651 % 2147483647;
+        if (tmp < 0) { tmp = -tmp; }
+        return tmp;
     }
 
     public void createGroup() {
@@ -57,7 +59,6 @@ public class ChordNode implements ChordNameService {
     }
 
     public void leaveGroup() {
-        System.out.println("ID: " + _myAddress + " :: wants to leave the network");
         try {
             _serverSocket.close();
         } catch (IOException e) {
@@ -79,7 +80,7 @@ public class ChordNode implements ChordNameService {
         if (_predecessor.equals(_myAddress)) {
             return _myAddress;
         }
-        
+
         if (_successor.equals(origin)) {
             return origin;
         }
@@ -97,7 +98,6 @@ public class ChordNode implements ChordNameService {
         Socket s = null;
         try {
             s = new Socket(_successor.getAddress(), _successor.getPort());
-            s.setSoTimeout(500);
         } catch (IOException e) {
             System.err.println("Could not establish a connection to my successor");
             System.err.println(e);
@@ -106,10 +106,10 @@ public class ChordNode implements ChordNameService {
         Message msg = new Message(Message.Type.LOOKUP, key, null);
         msg.origin = origin;
         _msgHandler.sendMessage(s, msg);
-        
+
 
         InetSocketAddress result = _msgHandler.receiveMessage(s).result;
-        
+
         return result;
 
     }
@@ -120,10 +120,7 @@ public class ChordNode implements ChordNameService {
             joinTheChordRing();
         }
 
-        System.out.println(this);
-
         while(_isRunning) {
-            System.out.println("ID: " + _myAddress + " :: waiting for a connection...");
             Socket s = null;
             try {
                 s = _serverSocket.accept();
@@ -135,24 +132,18 @@ public class ChordNode implements ChordNameService {
                 System.err.println(e);
             }
 
-            System.out.println("ID: " + _myAddress + " :: established a connection to " + s.getInetAddress() + ":" + s.getPort());
-
             Message incomingMsg = _msgHandler.receiveMessage(s);
 
             if (incomingMsg.type.equals(Message.Type.LOOKUP)) {
-                System.out.println("ID: " + _myAddress + " :: in the LOOKUP handler");
                 _msgHandler.sendMessage(s, new Message(Message.Type.LOOKUP, incomingMsg.key, lookup(incomingMsg.key, incomingMsg.origin)));
 
             } else if (incomingMsg.type.equals(Message.Type.GET_PREDECESSOR)) {
-                System.out.println("ID: " + _myAddress + " :: in the GET_PREDECESSOR handler");
                 _msgHandler.sendMessage(s, new Message(Message.Type.GET_PREDECESSOR, incomingMsg.key, _predecessor));
 
             } else if (incomingMsg.type.equals(Message.Type.SET_PREDECESSOR)) {
-                System.out.println("ID: " + _myAddress + " :: in the SET_PREDECESSOR handler");
                 _predecessor = incomingMsg.result;
 
             } else if (incomingMsg.type.equals(Message.Type.SET_SUCCESSOR)) {
-                System.out.println("ID: " + _myAddress + " :: in the SET_SUCCESSOR handler");
                 _successor = incomingMsg.result;
 
             }
@@ -164,7 +155,7 @@ public class ChordNode implements ChordNameService {
             }
 
         }
-        
+
         leaveTheChordRing();
 
     }
@@ -172,16 +163,15 @@ public class ChordNode implements ChordNameService {
     public String toString() {
         return "ID: " + _myAddress + " :: KEY: " + keyOfName(_myAddress) + " :: SUCC: " + _successor + " :: PRED: " + _predecessor;
     }
-    
+
     public String getGraphViz() {
         String result = "";
         result += keyOfName(getChordName()) + " -> " + keyOfName(succ()) + "\n";
         result += keyOfName(getChordName()) + " -> " + keyOfName(pred()) + "\n";
         return result;
     }
-    
+
     private void leaveTheChordRing() {        
-        System.out.println("ID: " + _myAddress + " :: started the leaving process");
         Socket s = null;
         try {
             s = new Socket(_successor.getAddress(), _successor.getPort());
@@ -201,14 +191,12 @@ public class ChordNode implements ChordNameService {
         }
         //send message to predecessor about changing his successor to my successor
         _msgHandler.sendMessage(s, new Message(Message.Type.SET_SUCCESSOR, 0, _successor));
-        System.out.println("ID: " + _myAddress + " :: has succesfully left the chord ring... Goodbye");
     }
 
     private void joinTheChordRing() {
-        
+
         _startTimeOfJoin = System.currentTimeMillis();
-        
-        System.out.println("ID: " + _myAddress + " :: started the joining process");
+
         Socket s = null;
         try {
             s = new Socket(_connectedAt.getAddress(), _connectedAt.getPort());
@@ -280,9 +268,9 @@ public class ChordNode implements ChordNameService {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
+
         _endTimeOfJoin = System.currentTimeMillis();
-        
+
     }
 
 }

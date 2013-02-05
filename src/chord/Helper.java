@@ -15,7 +15,6 @@ public class Helper {
     }
 
     public static boolean between(int k, int a, int b) {
-        System.out.println("===== KEY: " + k + " A: " + a + " B: " + b);
         k = k % (1 << 31);
         if (b <= a) {
             b += (1 << 31);
