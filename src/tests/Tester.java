@@ -1,4 +1,4 @@
-package chord;
+package tests;
 
 public class Tester {
     

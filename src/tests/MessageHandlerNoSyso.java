@@ -1,7 +1,9 @@
-package chord;
+package tests;
 
 import java.net.*;
 import java.io.*;
+
+import chord.Message;
 
 public class MessageHandlerNoSyso {
     

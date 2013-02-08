@@ -1,6 +1,9 @@
-package chord;
+package tests;
 
 import java.net.InetSocketAddress;
+
+import chord.ChordNameService;
+import chord.ChordNode;
 
 public class ChordNodeTime implements ChordNameService {
     

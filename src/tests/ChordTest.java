@@ -1,6 +1,8 @@
-package chord;
+package tests;
 
 import java.util.ArrayList;
+
+import chord.ChordNode;
 
 public class ChordTest implements Runnable {
 
@@ -302,11 +304,39 @@ public class ChordTest implements Runnable {
         System.out.println("}");
 
     }
+    
+    private static void concurrentJoining(int startPort) throws InterruptedException {
+    	ChordNode creator = new ChordNode(startPort);
+    	creator.createGroup();
+    	Thread t1 = new Thread(creator);
+    	t1.start();
+    	
+    	ChordNode node1 = new ChordNode(startPort+1);
+    	node1.joinGroup(creator.getChordName());
+    	ChordNode node2 = new ChordNode(startPort+2);
+    	node2.joinGroup(creator.getChordName());
+    	Thread t2 = new Thread(node1);
+    	Thread t3 = new Thread(node2);
+    	t2.start();
+    	t3.start();
+    	
+    	Thread.sleep(500);
+    	
+    	System.out.println(creator);
+    	System.out.println(node1);
+    	System.out.println(node2);
+    	
+    }
 
     public void run() {
         //testTime(40000, 1000);
-        testGraph(40000, 10);
+        //testGraph(40000, 10);
         //test6();
+    	try {
+			concurrentJoining(40000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
     }
 
 }

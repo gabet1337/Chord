@@ -1,7 +1,12 @@
-package chord;
+package tests;
 
 import java.io.IOException;
 import java.net.*;
+
+import chord.ChordNameService;
+import chord.Helper;
+import chord.Message;
+import chord.Message.Type;
 
 public class ChordNodeNoSyso implements ChordNameService {
 

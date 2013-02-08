@@ -1,7 +1,11 @@
-package chord;
+package tests;
 
 import java.io.IOException;
 import java.net.*;
+
+import chord.Message;
+import chord.MessageHandler;
+import chord.Message.Type;
 
 public class MessageHandlerTest {
 
